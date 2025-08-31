@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Philosophy Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Lighter blue-gray background */
+        }
+        .quiz-container {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease-in-out;
+        }
+        .answer-btn {
+            transition: all 0.2s ease-in-out;
+            border-width: 2px;
+        }
+        .answer-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .answer-btn.selected {
+            border-color: #3b82f6; /* Blue-500 */
+            background-color: #eff6ff; /* Blue-50 */
+        }
+        .answer-btn.correct {
+            background-color: #dcfce7; /* Green-100 */
+            border-color: #22c55e; /* Green-500 */
+            color: #15803d; /* Green-700 */
+        }
+        .answer-btn.incorrect {
+            background-color: #fee2e2; /* Red-100 */
+            border-color: #ef4444; /* Red-500 */
+            color: #b91c1c; /* Red-700 */
+        }
+        #feedback {
+            border-left-width: 4px;
+            padding-left: 1rem;
+            margin-top: 1rem;
+        }
+        #feedback.correct {
+            border-color: #22c55e; /* Green-500 */
+        }
+        #feedback.incorrect {
+            border-color: #ef4444; /* Red-500 */
+        }
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            animation: slide-up 0.3s ease-out;
+        }
+        @keyframes slide-up {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .progress-bar-inner {
+            transition: width 0.3s ease-in-out;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="quiz-container" class="quiz-container w-full max-w-3xl mx-auto p-6 sm:p-8 md:p-12">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4 text-center">Philosophy Quiz Engine</h1>
+            <p class="text-gray-600 mb-8 text-center text-lg">Test your knowledge, get personalized feedback, and generate new quizzes to master the concepts.</p>
+            <div class="text-center">
+                 <button id="start-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition-transform transform hover:scale-105">
+                    Start Quiz
+                </button>
+            </div>
+        </div>
+
+        <!-- Quiz Area -->
+        <div id="quiz-area" class="hidden">
+            <div id="progress-container" class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar-inner" style="width: 0%"></div>
+            </div>
+            <p id="question-counter" class="text-sm text-gray-500 mb-2"></p>
+            <h2 id="question" class="text-2xl font-semibold text-gray-800 mb-6"></h2>
+            <div id="answers" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div id="feedback-container" class="mt-6"></div>
+            <div class="flex justify-between mt-8">
+                <button id="submit-btn" class="bg-gray-300 text-gray-700 font-bold py-2 px-6 rounded-lg" disabled>Submit</button>
+                <button id="next-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg hidden">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Modal -->
+    <div id="results-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">Quiz Complete!</h2>
+            <p id="score-text" class="text-lg text-gray-600 mb-6"></p>
+            
+            <div class="border-t pt-6">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Diagnostic Report</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-lg font-semibold text-green-600 mb-2">Strengths</h4>
+                        <ul id="strengths-list" class="list-disc list-inside space-y-1 text-gray-700"></ul>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-red-600 mb-2">Areas for Improvement</h4>
+                        <ul id="improvements-list" class="list-disc list-inside space-y-1 text-gray-700"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t pt-6 mt-6">
+                 <h3 class="text-2xl font-semibold text-gray-800 mb-4">What's Next?</h3>
+                 <div class="flex flex-wrap gap-4 items-center">
+                    <button id="generate-study-guide-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">
+                        Generate Personalized Study Guide
+                    </button>
+                 </div>
+                 <div class="mt-6">
+                    <h4 class="text-lg font-semibold text-gray-700 mb-3">Generate a New Quiz</h4>
+                    <div id="new-quiz-loader" class="hidden my-4 flex justify-center"><div class="loader"></div></div>
+                    <div id="new-quiz-options" class="flex flex-wrap gap-4 items-center">
+                         <button data-difficulty="easier" class="new-quiz-btn bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Easier</button>
+                         <button data-difficulty="same" class="new-quiz-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Same Difficulty</button>
+                         <button data-difficulty="harder" class="new-quiz-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Harder</button>
+                         <button id="focus-weakness-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">Focus on Weak Areas</button>
+                    </div>
+                 </div>
+            </div>
+
+            <div class="text-right mt-8">
+                <button id="restart-btn" class="text-gray-600 hover:text-gray-900 font-semibold">Restart Original Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Study Guide Modal -->
+    <div id="study-guide-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">Your Personalized Study Guide</h2>
+            <div id="study-guide-content" class="prose max-w-none"></div>
+             <div class="text-right mt-8">
+                <button id="close-study-guide-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+<script type="module">
+    // --- STATE MANAGEMENT ---
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let selectedAnswerIndex = null;
+    let answeredQuestions = [];
+    let currentQuizData = [];
+
+    // --- INITIAL QUIZ DATA ---
+    const initialQuizData = [
+        {
+            topic: "Introductory Philosophy",
+            difficulty: "easy",
+            question: "According to the introductory materials, which of the following correctly pairs a core branch of philosophy with the fundamental question it investigates?",
+            hint: "Each of the three main branches of philosophy—Metaphysics, Epistemology, and Ethics—has its own distinct set of core questions.",
+            answerOptions: [
+                { text: "Metaphysics: What is the nature of knowledge and how do we acquire it?", isCorrect: false, rationale: "This question is central to epistemology, which studies knowledge, not metaphysics." },
+                { text: "Epistemology: What is the fundamental nature of reality and existence?", isCorrect: false, rationale: "This question is the primary focus of metaphysics, which investigates the nature of being." },
+                { text: "Ethics: What makes an action morally right or wrong?", isCorrect: true, rationale: "Ethics is the branch of philosophy that systematically investigates questions of morality, value, and how we ought to live." },
+                { text: "Logic: Are humans wholly material objects or do they have an immaterial mind?", isCorrect: false, rationale: "This is a classic metaphysical question about the nature of the self. Logic is a method used in philosophy, not a branch that asks this specific question." }
+            ]
+        },
+        {
+            topic: "The Ethics of Belief",
+            difficulty: "easy",
+            question: "What is William K. Clifford's primary thesis in 'The Ethics of Belief'?",
+            hint: "Consider the shipowner case: does the shipowner's guilt depend on whether the ship actually sinks?",
+            answerOptions: [
+                { text: "A belief is wrong only if it turns out to be false and causes harm.", isCorrect: false, rationale: "Clifford argues that the morality of a belief is determined by its origin, not by its truth value or its accidental consequences." },
+                { text: "It is morally wrong to hold any belief without sufficient evidence, regardless of the outcome.", isCorrect: true, rationale: "This is Clifford's central, uncompromising principle. The moral failure lies in the process of believing, not the result." },
+                { text: "Sincerely held religious beliefs are exempt from the duty of inquiry.", isCorrect: false, rationale: "Clifford's principle is universal ('always, everywhere, and for anyone'), making no exceptions for religious or comforting beliefs." },
+                { text: "Beliefs are a private matter and only the actions that result from them can be judged morally.", isCorrect: false, rationale: "A core part of Clifford's argument is that beliefs are never a purely private matter and are inseparable from action, making belief itself a moral issue." }
+            ]
+        },
+        {
+            topic: "Philosophical Methods",
+            difficulty: "easy",
+            question: "Inference to the Best Explanation (IBE) is a method of reasoning where one:",
+            hint: "Think of the 'philosophical detective' analogy. What is the detective doing when they have multiple suspects and clues?",
+            answerOptions: [
+                { text: "Proves a conclusion with logical certainty from a set of premises.", isCorrect: false, rationale: "This describes deductive reasoning, which guarantees its conclusion if the premises are true. IBE deals with probable, not certain, conclusions." },
+                { text: "Generalizes a universal rule from a series of particular observations.", isCorrect: false, rationale: "This describes inductive reasoning, like concluding all swans are white after seeing many white swans. IBE is about explaining observations, not just generalizing from them." },
+                { text: "Chooses the most plausible hypothesis from a set of competing explanations for a given body of evidence.", isCorrect: true, rationale: "This is the essence of IBE: it is a comparative process of evaluating alternative theories to see which one best accounts for the data." },
+                { text: "Balances general principles against specific judgments to achieve a coherent system of beliefs.", isCorrect: false, rationale: "This describes the method of reflective equilibrium, not Inference to the Best Explanation." }
+            ]
+        },
+        {
+            topic: "Philosophical Methods",
+            difficulty: "medium",
+            question: "The primary reason for aiming for 'Wide' rather than 'Narrow' Reflective Equilibrium is to:",
+            hint: "What is the danger of only trying to make sense of your own pre-existing beliefs without looking at other points of view?",
+            answerOptions: [
+                { text: "Reach a conclusion more quickly and efficiently.", isCorrect: false, rationale: "Achieving Wide Reflective Equilibrium is a more demanding and lengthy process because it requires evaluating alternative theories." },
+                { text: "Ensure that one's final belief system is foundational and based on self-evident truths.", isCorrect: false, rationale: "Reflective Equilibrium is a coherentist, not a foundationalist, method. It does not rely on self-evident truths." },
+                { text: "Protect against the risk of merely systematizing one's own initial biases by forcing a confrontation with competing philosophical theories.", isCorrect: true, rationale: "Wide equilibrium is the ultimate goal because it challenges one's viewpoint by considering plausible alternatives, preventing a parochial or biased outcome." },
+                { text: "Create a system of beliefs that is internally consistent but does not need to account for all of one's considered judgments.", isCorrect: false, rationale: "A core goal of any form of reflective equilibrium is comprehensiveness—accounting for the full spectrum of one's considered convictions." }
+            ]
+        },
+        {
+            topic: "The Ethics of Belief",
+            difficulty: "medium",
+            question: "An ER doctor has a patient with unusual symptoms. Based on her extensive experience (background knowledge), she quickly forms a belief about a rare diagnosis and administers a life-saving treatment. She did not have time to run all possible tests. How does this scenario challenge Clifford's thesis?",
+            hint: "Consider Clifford's harsh final statement: 'Then he should have no time to believe.' Is this always a practical or moral option?",
+            answerOptions: [
+                { text: "It doesn't challenge it at all, because the doctor was correct.", isCorrect: false, rationale: "Clifford argues that the outcome is irrelevant to the morality of the belief. If the doctor's evidence was insufficient, she would be blameworthy even if she was right." },
+                { text: "It suggests that in high-stakes, time-sensitive situations, acting on strong but technically 'insufficient' evidence may be a moral necessity, creating a conflict of duties.", isCorrect: true, rationale: "This poses a powerful challenge. Clifford's final admonition is 'if he should have no time to believe,' but an ER doctor has a competing duty to act. This highlights a potential limitation or required nuance in Clifford's absolute rule." },
+                { text: "It supports Clifford's thesis because the doctor used the 'principle of uniformity.'", isCorrect: false, rationale: "While the doctor's reasoning uses past experience, the core challenge is whether her evidence meets the 'sufficient' threshold given the lack of time for a full inquiry." },
+                { text: "It shows that medical ethics is a separate domain not covered by Clifford's rules for belief.", isCorrect: false, rationale: "Clifford's thesis is explicitly universal, covering beliefs 'always, everywhere, and for anyone,' so it would apply to the doctor's belief formation." }
+            ]
+        },
+        {
+            topic: "Philosophical Methods",
+            difficulty: "hard",
+            question: "How might a philosopher use Inference to the Best Explanation (IBE) *within* the process of achieving Wide Reflective Equilibrium?",
+            hint: "Reflective Equilibrium requires us to 'propose principles' and 'resolve conflicts.' How might we decide which proposed principle is the best one to resolve a conflict?",
+            answerOptions: [
+                { text: "This is impossible, as the two methods are contradictory and cannot be used together.", isCorrect: false, rationale: "The methods are not contradictory; they operate at different levels of justification and can be seen as complementary." },
+                { text: "When faced with multiple, competing general principles that could explain a set of considered judgments, they could use IBE to determine which principle is the 'best explanation.'", isCorrect: true, rationale: "This is a plausible way the methods can interact. RE requires us to find principles that best account for our judgments. IBE, with its criteria of simplicity, scope, etc., provides a rational way to choose among candidate principles." },
+                { text: "They would first use IBE to determine the one true foundational belief, then use RE to build a system upon it.", isCorrect: false, rationale: "This incorrectly mixes IBE with a foundationalist structure, which RE rejects. Neither method is primarily about finding a single foundational belief." },
+                { text: "They would use RE to formulate a theory and then use IBE to ensure the theory is not falsifiable.", isCorrect: false, rationale: "This misrepresents the goals of both methods. Falsifiability is generally considered a virtue in a theory, not something to be avoided." }
+            ]
+        },
+        // Adding a few more for a good starting set
+        {
+            topic: "The Ethics of Belief",
+            difficulty: "medium",
+            question: "According to Clifford, one of the most insidious harms of credulity is that 'the credulous man is father to the liar.' What does this mean?",
+            hint: "'Men speak the truth to one another when each reveres the truth in his own mind and in the other's mind'. What happens when that reverence is absent?",
+            answerOptions: [
+                { text: "People who believe things without evidence are more likely to have children who lie.", isCorrect: false, rationale: "This interprets the phrase too literally. Clifford is making a point about social dynamics, not genetics or parenting." },
+                { text: "If I am careless about the truth and believe things easily, I create an environment where others feel no obligation to tell me the truth.", isCorrect: true, rationale: "Clifford argues that when we don't revere the truth, others won't revere it in their communications with us, surrounding us with 'a thick atmosphere of falsehood and fraud'." },
+                { text: "Believing a lie is the same moral offense as telling a lie.", isCorrect: false, rationale: "While both are moral failings in Clifford's view, his point here is causal: the habit of credulity in a listener encourages the habit of dishonesty in a speaker." },
+                { text: "Only people who are frequently lied to can be considered credulous.", isCorrect: false, rationale: "Clifford's argument flows in the opposite direction: being a credulous person *invites* others to be dishonest." }
+            ]
+        }
+    ];
+
+    // --- DOM ELEMENTS ---
+    const quizContainer = document.getElementById('quiz-container');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const quizArea = document.getElementById('quiz-area');
+    const questionEl = document.getElementById('question');
+    const answersEl = document.getElementById('answers');
+    const feedbackContainerEl = document.getElementById('feedback-container');
+    const submitBtn = document.getElementById('submit-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const startBtn = document.getElementById('start-btn');
+    const questionCounterEl = document.getElementById('question-counter');
+    const progressBar = document.getElementById('progress-bar');
+    
+    // Modals
+    const resultsModal = document.getElementById('results-modal');
+    const scoreText = document.getElementById('score-text');
+    const strengthsList = document.getElementById('strengths-list');
+    const improvementsList = document.getElementById('improvements-list');
+    const restartBtn = document.getElementById('restart-btn');
+    
+    const studyGuideModal = document.getElementById('study-guide-modal');
+    const generateStudyGuideBtn = document.getElementById('generate-study-guide-btn');
+    const studyGuideContent = document.getElementById('study-guide-content');
+    const closeStudyGuideBtn = document.getElementById('close-study-guide-btn');
+
+    const newQuizLoader = document.getElementById('new-quiz-loader');
+    const newQuizOptions = document.getElementById('new-quiz-options');
+    const newQuizBtns = document.querySelectorAll('.new-quiz-btn');
+    const focusWeaknessBtn = document.getElementById('focus-weakness-btn');
+
+    // --- EVENT LISTENERS ---
+    startBtn.addEventListener('click', startQuiz);
+    nextBtn.addEventListener('click', nextQuestion);
+    submitBtn.addEventListener('click', checkAnswer);
+    restartBtn.addEventListener('click', () => {
+        resultsModal.classList.add('hidden');
+        startQuiz(true); // Restart with initial data
+    });
+    generateStudyGuideBtn.addEventListener('click', showStudyGuide);
+    closeStudyGuideBtn.addEventListener('click', () => studyGuideModal.classList.add('hidden'));
+    
+    newQuizBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => generateNewQuiz(e.target.dataset.difficulty));
+    });
+    focusWeaknessBtn.addEventListener('click', () => generateNewQuiz('same', true));
+
+
+    // --- QUIZ LOGIC ---
+    function startQuiz(isRestart = false) {
+        if (isRestart) {
+            currentQuizData = [...initialQuizData];
+        } else {
+             // On first start, also use initial data.
+            currentQuizData = [...initialQuizData];
+        }
+       
+        currentQuestionIndex = 0;
+        score = 0;
+        answeredQuestions = [];
+        welcomeScreen.classList.add('hidden');
+        quizArea.classList.remove('hidden');
+        resultsModal.classList.add('hidden');
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        resetState();
+        const question = currentQuizData[currentQuestionIndex];
+        questionEl.textContent = question.question;
+        questionCounterEl.textContent = `Question ${currentQuestionIndex + 1} of ${currentQuizData.length}`;
+        progressBar.style.width = `${((currentQuestionIndex) / currentQuizData.length) * 100}%`;
+        
+        question.answerOptions.forEach((answer, index) => {
+            const button = document.createElement('button');
+            button.innerHTML = answer.text;
+            button.classList.add('answer-btn', 'p-4', 'w-full', 'text-left', 'border-2', 'border-gray-300', 'rounded-lg', 'hover:bg-gray-100');
+            button.dataset.index = index;
+            button.addEventListener('click', selectAnswer);
+            answersEl.appendChild(button);
+        });
+    }
+    
+    function resetState() {
+        nextBtn.classList.add('hidden');
+        submitBtn.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('bg-gray-300', 'text-gray-700');
+        submitBtn.classList.remove('bg-blue-600', 'text-white');
+        feedbackContainerEl.innerHTML = '';
+        while (answersEl.firstChild) {
+            answersEl.removeChild(answersEl.firstChild);
+        }
+    }
+
+    function selectAnswer(e) {
+        const selectedButton = e.target;
+        selectedAnswerIndex = parseInt(selectedButton.dataset.index);
+        
+        Array.from(answersEl.children).forEach(button => {
+            button.classList.remove('selected');
+        });
+        selectedButton.classList.add('selected');
+        
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('bg-gray-300', 'text-gray-700');
+        submitBtn.classList.add('bg-blue-600', 'text-white');
+    }
+
+    function checkAnswer() {
+        const question = currentQuizData[currentQuestionIndex];
+        const correct = question.answerOptions[selectedAnswerIndex].isCorrect;
+
+        // Store answer for diagnostics
+        answeredQuestions.push({
+            questionData: question,
+            userAnswerIndex: selectedAnswerIndex,
+            isCorrect: correct
+        });
+
+        if (correct) {
+            score++;
+        }
+        
+        // Show feedback
+        const feedbackEl = document.createElement('div');
+        feedbackEl.id = 'feedback';
+        const rationale = question.answerOptions[selectedAnswerIndex].rationale;
+        feedbackEl.innerHTML = `<p class="font-semibold">${correct ? 'Correct!' : 'Incorrect.'}</p><p class="text-gray-600">${rationale}</p>`;
+        feedbackEl.classList.add(correct ? 'correct' : 'incorrect');
+        feedbackContainerEl.appendChild(feedbackEl);
+
+        // Style buttons
+        Array.from(answersEl.children).forEach((button, index) => {
+            const option = question.answerOptions[index];
+            if (option.isCorrect) {
+                button.classList.add('correct');
+            } else if (index === selectedAnswerIndex) {
+                button.classList.add('incorrect');
+            }
+            button.disabled = true;
+        });
+
+        submitBtn.classList.add('hidden');
+        nextBtn.classList.remove('hidden');
+        progressBar.style.width = `${((currentQuestionIndex + 1) / currentQuizData.length) * 100}%`;
+    }
+
+    function nextQuestion() {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentQuizData.length) {
+            renderQuestion();
+        } else {
+            showResults();
+        }
+    }
+
+    // --- RESULTS, DIAGNOSTICS, AND STUDY GUIDE ---
+    function showResults() {
+        quizArea.classList.add('hidden');
+        scoreText.textContent = `You scored ${score} out of ${currentQuizData.length}.`;
+        
+        const { strengths, improvements } = analyzePerformance();
+        
+        strengthsList.innerHTML = '';
+        improvementsList.innerHTML = '';
+
+        if (strengths.length > 0) {
+            strengths.forEach(topic => {
+                const li = document.createElement('li');
+                li.textContent = topic;
+                strengthsList.appendChild(li);
+            });
+        } else {
+             strengthsList.innerHTML = '<li>No specific strengths identified. Keep practicing!</li>';
+        }
+
+        if (improvements.length > 0) {
+            improvementsList.innerHTML = '';
+            improvements.forEach(topic => {
+                const li = document.createElement('li');
+                li.textContent = topic;
+                improvementsList.appendChild(li);
+            });
+            focusWeaknessBtn.disabled = false;
+            focusWeaknessBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        } else {
+            improvementsList.innerHTML = '<li>No specific areas for improvement found. Great job!</li>';
+            focusWeaknessBtn.disabled = true;
+            focusWeaknessBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        resultsModal.classList.remove('hidden');
+    }
+
+    function analyzePerformance() {
+        const topicPerformance = {};
+
+        answeredQuestions.forEach(ans => {
+            const topic = ans.questionData.topic;
+            if (!topicPerformance[topic]) {
+                topicPerformance[topic] = { correct: 0, incorrect: 0 };
+            }
+            if (ans.isCorrect) {
+                topicPerformance[topic].correct++;
+            } else {
+                topicPerformance[topic].incorrect++;
+            }
+        });
+
+        const strengths = [];
+        const improvements = [];
+
+        for (const topic in topicPerformance) {
+            const stats = topicPerformance[topic];
+            if (stats.incorrect === 0 && stats.correct > 0) {
+                strengths.push(topic);
+            } else if (stats.incorrect > 0) {
+                improvements.push(topic);
+            }
+        }
+        return { strengths, improvements };
+    }
+
+    function showStudyGuide() {
+        const { improvements } = analyzePerformance();
+        if (improvements.length === 0) {
+            studyGuideContent.innerHTML = '<h3>Excellent Work!</h3><p>No specific areas for improvement were identified. You have a strong grasp of all the topics in this quiz.</p>';
+        } else {
+            // In a real app, this would be a more sophisticated generation.
+            // Here, we'll create a simple guide based on the weak topics.
+            let guideHTML = `<h3>Focus Areas</h3><p>Based on your results, here are the key concepts to review:</p>`;
+            improvements.forEach(topic => {
+                guideHTML += `<div class="mt-4"><h4>${topic}</h4><ul class="list-disc pl-5">`;
+                answeredQuestions.forEach(ans => {
+                    if (ans.questionData.topic === topic && !ans.isCorrect) {
+                        guideHTML += `<li>For the question "${ans.questionData.question}", remember that the correct answer relates to: ${ans.questionData.answerOptions.find(opt => opt.isCorrect).rationale}</li>`;
+                    }
+                });
+                guideHTML += `</ul></div>`;
+            });
+            studyGuideContent.innerHTML = guideHTML;
+        }
+        studyGuideModal.classList.remove('hidden');
+    }
+
+    // --- LLM-POWERED QUESTION GENERATION ---
+    async function generateNewQuiz(difficulty, focusOnWeakness = false) {
+        newQuizOptions.classList.add('hidden');
+        newQuizLoader.classList.remove('hidden');
+
+        const { improvements } = analyzePerformance();
+        const topics = focusOnWeakness && improvements.length > 0 ? improvements : ['Introductory Philosophy', 'The Ethics of Belief', 'Philosophical Methods'];
+
+        const systemPrompt = `You are a philosophy professor creating a quiz. Generate 5 new multiple-choice questions. The questions should be about the following topics: ${topics.join(', ')}. The difficulty should be '${difficulty}'. Do not repeat these previous questions: ${currentQuizData.map(q => `"${q.question}"`).join(', ')}. Return the questions as a valid JSON array of objects. Each object must have keys: "topic", "difficulty", "question", "hint", and "answerOptions". "answerOptions" must be an array of 4 objects, each with keys "text", "isCorrect" (boolean), and "rationale". Exactly one option must have "isCorrect" set to true.`;
+        
+        const userQuery = "Generate 5 new quiz questions based on the provided system instructions.";
+
+        const apiKey = ""; // API Key is handled by the environment
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            },
+            generationConfig: {
+                responseMimeType: "application/json",
+            }
+        };
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const jsonText = result.candidates[0].content.parts[0].text;
+            const newQuestions = JSON.parse(jsonText);
+            
+            // Validate the received structure before using it
+            if (Array.isArray(newQuestions) && newQuestions.length > 0) {
+                 currentQuizData = newQuestions;
+                 resultsModal.classList.add('hidden');
+                 startQuiz(false); // Start with new data, don't use initial
+            } else {
+                throw new Error("Invalid question format received from API.");
+            }
+
+        } catch (error) {
+            console.error("Failed to generate new quiz:", error);
+            alert("Sorry, there was an error creating your new quiz. Please try again.");
+        } finally {
+            newQuizLoader.classList.add('hidden');
+            newQuizOptions.classList.remove('hidden');
+        }
+    }
+
+
+</script>
+</body>
+</html>
